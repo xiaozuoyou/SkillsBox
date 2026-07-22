@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SkillsBox",
+  "version": "0.1.0",
+  "identifier": "com.zuoyou.skillsbox",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "title": "SkillsBox",
+        "width": 1040,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 560,
+        "decorations": false,
+        "transparent": false,
+        "shadow": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI4NzMxMUVGRkRGRDg5M0IKUldRN2lmMzk3eEZ6S0RIYXNteEdXNmRlNVJFd1lCRTcrZGM1WGczTk90SVdHSUFNcHFkWlZ6UW8K",
+      "endpoints": [
+        "https://github.com/xiaozuoyou/SkillsBox/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

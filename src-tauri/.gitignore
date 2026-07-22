@@ -1,0 +1,5 @@
+# Cargo build output (no trailing slash: also matches a target → external disk symlink)
+/target
+
+# Tauri-generated capability schemas (regenerated on build)
+/gen/schemas
