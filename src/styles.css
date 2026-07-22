@@ -607,7 +607,8 @@ html[data-theme="dark"] .view-settings {
 .settings-card > .settings-about-blurb,
 .settings-card > .settings-row-title,
 .settings-card > .settings-field-hint,
-.settings-card > .settings-oss-block {
+.settings-card > .settings-oss-block,
+.settings-card > .settings-update-block {
   padding-left: 18px;
   padding-right: 18px;
 }
@@ -1098,22 +1099,173 @@ body.is-resizing-sidebar * {
   }
 }
 
-.settings-update-actions {
-  margin-top: 10px;
+/* App update card (about page) */
+.settings-card-update {
+  padding: 14px 0;
+}
+
+.settings-update-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+.settings-update-head {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  width: 100%;
+}
+
+.settings-update-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.settings-update-copy .settings-row-title {
+  margin: 0;
+}
+
+.settings-update-version {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-update-version-new {
+  margin-left: 6px;
+  font-weight: 550;
+  color: color-mix(in srgb, #3b82f6 70%, var(--text));
+}
+
+.settings-update-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.settings-update-toolbar .btn {
+  white-space: nowrap;
+}
+
+.settings-update-progress {
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  overflow: hidden;
+}
+
+.settings-update-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--text);
+  opacity: 0.55;
+  transition: width 0.15s ease-out;
 }
 
 .settings-update-status {
-  margin-top: 10px;
-  white-space: pre-wrap;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--settings-radius-sm);
+  border: 1px solid var(--settings-card-border);
+  background: color-mix(in srgb, var(--bg) 55%, var(--settings-card-bg));
+}
+
+.settings-update-status-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 35%, transparent);
+}
+
+.settings-update-status-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.settings-update-status-msg {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.settings-update-status--ok {
+  border-color: color-mix(in srgb, #3d9b6a 28%, var(--settings-card-border));
+  background: color-mix(in srgb, #3d9b6a 8%, var(--settings-card-bg));
+}
+
+.settings-update-status--ok .settings-update-status-dot {
+  background: #3d9b6a;
+}
+
+.settings-update-status--ok .settings-update-status-msg {
+  color: color-mix(in srgb, #1a5c3a 50%, var(--text));
+}
+
+html[data-theme="dark"] .settings-update-status--ok .settings-update-status-msg {
+  color: #a7e3c4;
+}
+
+.settings-update-status--info {
+  border-color: color-mix(in srgb, #3b82f6 26%, var(--settings-card-border));
+  background: color-mix(in srgb, #3b82f6 7%, var(--settings-card-bg));
+}
+
+.settings-update-status--info .settings-update-status-dot {
+  background: #3b82f6;
+}
+
+.settings-update-status--error {
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--settings-card-border));
+  background: color-mix(in srgb, var(--danger) 8%, var(--settings-card-bg));
+}
+
+.settings-update-status--error .settings-update-status-dot {
+  background: var(--danger);
+}
+
+.settings-update-status--error .settings-update-status-msg {
+  color: var(--danger);
+}
+
+.settings-update-status--progress {
+  border-color: var(--settings-card-border);
+}
+
+.settings-update-status--progress .settings-update-status-dot {
+  background: color-mix(in srgb, var(--text) 45%, transparent);
 }
 
 .settings-update-notes {
-  display: block;
-  margin-top: 6px;
-  opacity: 0.9;
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  white-space: pre-wrap;
   max-height: 8em;
   overflow: auto;
 }
+
 
 .sidebar-batch {
   flex: 0 0 auto;

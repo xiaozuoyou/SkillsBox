@@ -46,6 +46,9 @@ export function SettingsView({
   const [section, setSection] = useState<SettingsSection>("general");
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [updateStatusKind, setUpdateStatusKind] = useState<
+    "idle" | "ok" | "info" | "error" | "progress"
+  >("idle");
   const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
   const [downloadPct, setDownloadPct] = useState<number | null>(null);
 
@@ -53,12 +56,14 @@ export function SettingsView({
     if (updateBusy) return;
     setUpdateBusy(true);
     setUpdateStatus(null);
+    setUpdateStatusKind("idle");
     setPendingUpdate(null);
     setDownloadPct(null);
     try {
       const update = await checkForAppUpdate();
       if (!update) {
         setUpdateStatus(t("settings.updateUpToDate"));
+        setUpdateStatusKind("ok");
         return;
       }
       setPendingUpdate(update);
@@ -68,9 +73,12 @@ export function SettingsView({
           current: update.currentVersion,
         }),
       );
+      setUpdateStatusKind("info");
     } catch (e) {
+      // Surface via toast only — no in-card error banner below the actions.
       onError(typeof e === "string" ? e : e instanceof Error ? e.message : String(e));
-      setUpdateStatus(t("settings.updateCheckFailed"));
+      setUpdateStatus(null);
+      setUpdateStatusKind("idle");
     } finally {
       setUpdateBusy(false);
     }
@@ -81,6 +89,7 @@ export function SettingsView({
     setUpdateBusy(true);
     setDownloadPct(0);
     setUpdateStatus(t("settings.updateDownloading"));
+    setUpdateStatusKind("progress");
     try {
       await installAppUpdate(pendingUpdate, ({ downloaded, total }) => {
         if (total && total > 0) {
@@ -89,9 +98,12 @@ export function SettingsView({
       });
       // relaunch exits the process; if we return, something unexpected happened
       setUpdateStatus(t("settings.updateInstalled"));
+      setUpdateStatusKind("ok");
     } catch (e) {
       onError(typeof e === "string" ? e : e instanceof Error ? e.message : String(e));
-      setUpdateStatus(t("settings.updateInstallFailed"));
+      setUpdateStatus(null);
+      setUpdateStatusKind("idle");
+      setDownloadPct(null);
       setUpdateBusy(false);
     }
   };
@@ -342,54 +354,89 @@ export function SettingsView({
             </section>
 
             <section
-              className="settings-card"
+              className="settings-card settings-card-update"
               aria-label={t("settings.updateSection")}
             >
-              <div className="settings-row-title">{t("settings.updateSection")}</div>
-              <span className="settings-field-hint">
-                {t("settings.updateHint")}
-              </span>
-              <div className="settings-card-actions settings-update-actions">
-                <button
-                  type="button"
-                  className="btn settings-card-btn"
-                  disabled={updateBusy}
-                  onClick={() => void onCheckAppUpdate()}
-                >
-                  {updateBusy && !pendingUpdate
-                    ? t("settings.updateChecking")
-                    : t("settings.checkUpdate")}
-                </button>
-                {pendingUpdate ? (
-                  <button
-                    type="button"
-                    className="btn primary settings-card-btn"
-                    disabled={updateBusy}
-                    onClick={() => void onInstallAppUpdate()}
+              <div className="settings-update-block">
+                <div className="settings-update-head">
+                  <div className="settings-update-copy">
+                    <div className="settings-row-title">
+                      {t("settings.updateSection")}
+                    </div>
+                    <p className="settings-update-version">
+                      {t("settings.version", { version: APP_VERSION })}
+                      {pendingUpdate ? (
+                        <span className="settings-update-version-new">
+                          → {pendingUpdate.version}
+                        </span>
+                      ) : null}
+                    </p>
+                  </div>
+                  <div className="settings-update-toolbar">
+                    <button
+                      type="button"
+                      className="btn settings-card-btn"
+                      disabled={updateBusy}
+                      onClick={() => void onCheckAppUpdate()}
+                    >
+                      {updateBusy && !pendingUpdate
+                        ? t("settings.updateChecking")
+                        : t("settings.checkUpdate")}
+                    </button>
+                    {pendingUpdate ? (
+                      <button
+                        type="button"
+                        className="btn primary settings-card-btn"
+                        disabled={updateBusy}
+                        onClick={() => void onInstallAppUpdate()}
+                      >
+                        {updateBusy
+                          ? downloadPct != null
+                            ? t("settings.updateProgress", { pct: downloadPct })
+                            : t("settings.updateDownloading")
+                          : t("settings.installUpdate", {
+                              version: pendingUpdate.version,
+                            })}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                {updateBusy && downloadPct != null ? (
+                  <div
+                    className="settings-update-progress"
+                    role="progressbar"
+                    aria-valuenow={downloadPct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
                   >
-                    {updateBusy
-                      ? downloadPct != null
-                        ? t("settings.updateProgress", { pct: downloadPct })
-                        : t("settings.updateDownloading")
-                      : t("settings.installUpdate", {
-                          version: pendingUpdate.version,
-                        })}
-                  </button>
+                    <div
+                      className="settings-update-progress-bar"
+                      style={{ width: `${downloadPct}%` }}
+                    />
+                  </div>
+                ) : null}
+
+                {updateStatus ? (
+                  <div
+                    className={`settings-update-status settings-update-status--${updateStatusKind}`}
+                    role="status"
+                  >
+                    <span
+                      className="settings-update-status-dot"
+                      aria-hidden="true"
+                    />
+                    <div className="settings-update-status-body">
+                      <p className="settings-update-status-msg">{updateStatus}</p>
+                      {pendingUpdate?.body && updateStatusKind === "info" ? (
+                        <p className="settings-update-notes">
+                          {pendingUpdate.body}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
                 ) : null}
               </div>
-              {updateStatus ? (
-                <p className="settings-field-hint settings-update-status">
-                  {updateStatus}
-                  {pendingUpdate?.body ? (
-                    <>
-                      <br />
-                      <span className="settings-update-notes">
-                        {pendingUpdate.body}
-                      </span>
-                    </>
-                  ) : null}
-                </p>
-              ) : null}
             </section>
 
             <section className="settings-card settings-card-open-source">

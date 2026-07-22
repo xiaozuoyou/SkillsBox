@@ -123,8 +123,6 @@ const catalog = {
     pathChanged: "数据已改为存放在 {path}",
     pathReset: "已恢复默认数据存放位置",
     updateSection: "应用更新",
-    updateHint:
-      "通过 GitHub Releases 检查 SkillsBox 新版本（当前仅 macOS）。与 skill 仓库更新无关。",
     checkUpdate: "检查更新",
     updateChecking: "检查中…",
     updateUpToDate: "已是最新版本",

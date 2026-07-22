@@ -110,8 +110,6 @@ export const en = {
     pathChanged: "Data location is now {path}",
     pathReset: "Restored the default data location",
     updateSection: "App updates",
-    updateHint:
-      "Check GitHub Releases for a new SkillsBox build (macOS only for now). Unrelated to skill-repo updates.",
     checkUpdate: "Check for updates",
     updateChecking: "Checking…",
     updateUpToDate: "You’re on the latest version",
