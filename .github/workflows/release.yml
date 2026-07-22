@@ -25,10 +25,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Do not set "version" here — package.json "packageManager" is pnpm@10.26.1.
+      # Specifying both causes ERR_PNPM_BAD_PM_VERSION (Multiple versions of pnpm).
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node
         uses: actions/setup-node@v4
