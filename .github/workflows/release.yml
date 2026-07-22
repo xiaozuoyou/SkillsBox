@@ -22,8 +22,9 @@ jobs:
   release-macos:
     runs-on: macos-latest
     steps:
+      # Action majors that run on Node 24 (Node 20 is deprecated on GHA runners).
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Do not set "version" here — package.json "packageManager" is pnpm@10.26.1.
       # Specifying both causes ERR_PNPM_BAD_PM_VERSION (Multiple versions of pnpm).
@@ -31,7 +32,7 @@ jobs:
         uses: pnpm/action-setup@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
