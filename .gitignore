@@ -1,0 +1,82 @@
+# —— Dependencies ——
+node_modules/
+
+# —— Frontend (Vite / TypeScript) ——
+dist/
+dist-ssr/
+*.local
+*.tsbuildinfo
+.vite/
+coverage/
+.turbo/
+.eslintcache
+.stylelintcache
+
+# —— Logs ——
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# —— Environment / local overrides ——
+.env
+.env.*
+!.env.example
+
+# —— Tauri updater signing (never commit private keys) ——
+# Whole dir is private; pubkey already lives in tauri.conf.json
+secrets/
+# Extra safety if a key is ever placed outside secrets/
+*.key
+!*.key.pub
+
+# —— Rust / Tauri build output ——
+# No trailing slash: also ignores a `target` symlink (e.g. to external disk)
+src-tauri/target
+/target
+# Tauri-generated capability schemas (regenerated on build; see src-tauri/.gitignore)
+src-tauri/gen/schemas
+
+# —— Test / temp ——
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*~
+
+# —— OS junk ——
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+# Windows (for future)
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# —— Editors / IDEs ——
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.code-workspace
+
+# —— Optional local tooling ——
+.direnv/
+.history/
+.pnpm-store/
+.parcel-cache/
+.cache/
