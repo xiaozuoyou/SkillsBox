@@ -18,7 +18,7 @@
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19" /></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-backend-DEA584?logo=rust&logoColor=black" alt="Rust" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
-  <img src="https://img.shields.io/badge/version-0.1.0-informational" alt="Version" />
+  <img src="https://img.shields.io/badge/version-0.1.2-informational" alt="Version" />
 </p>
 
 ---
