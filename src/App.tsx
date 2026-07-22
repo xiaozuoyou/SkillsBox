@@ -3,20 +3,26 @@ import { createPortal } from "react-dom";
 import logoUrl from "./assets/logo.png";
 import { CreateModal } from "./components/CreateModal";
 import { EnableModal } from "./components/EnableModal";
+import { GhostIconButton } from "./components/GhostIconButton";
 import {
+  AddIcon,
   CollapseAllIcon,
+  CreateIcon,
   ExpandAllIcon,
+  ImportIcon,
   RefreshIcon,
   SettingsIcon,
 } from "./components/Icons";
 import { ImportModal } from "./components/ImportModal";
+import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import { SettingsView } from "./components/SettingsView";
-import { SkillDetailPanel } from "./components/SkillDetail";
+import { SkillBodyModal } from "./components/SkillBodyModal";
 import { SkillList } from "./components/SkillList";
 import { Toast, type ToastState } from "./components/Toast";
 import { WindowControls } from "./components/WindowControls";
 import { useCollapsedGroups } from "./hooks/useCollapsedGroups";
 import { useFavorites } from "./hooks/useFavorites";
+import { useRecentProjects } from "./hooks/useRecentProjects";
 import { useSidebarResize } from "./hooks/useSidebarResize";
 import { useTheme } from "./hooks/useTheme";
 import { useI18n } from "./i18n/context";
@@ -26,6 +32,7 @@ import { api, errMsg } from "./lib/api";
 import { groupByRepo } from "./lib/skills";
 import type {
   AppState,
+  EnableRecord,
   GitRepoUpdateStatus,
   ImportResult,
   LibraryTab,
@@ -34,6 +41,8 @@ import type {
   SkillListItem,
   ViewName,
 } from "./lib/types";
+
+const ACTIVE_PROJECT_KEY = "skillsbox.activeProject";
 
 export function App() {
   const { t } = useI18n();
@@ -50,9 +59,23 @@ export function App() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [viewSkill, setViewSkill] = useState<SkillListItem | null>(null);
   const [enableOpen, setEnableOpen] = useState(false);
   const [enableBusy, setEnableBusy] = useState(false);
   const [enableScope, setEnableScope] = useState<"single" | "favorites">("single");
+
+  /** Project workspace: right pane + left-list quick enable target */
+  const [projectPath, setProjectPath] = useState<string | null>(() => {
+    try {
+      const p = localStorage.getItem(ACTIVE_PROJECT_KEY);
+      return p && p.trim() ? p.trim() : null;
+    } catch {
+      return null;
+    }
+  });
+  const [projectEnables, setProjectEnables] = useState<EnableRecord[]>([]);
+  const [projectBusy, setProjectBusy] = useState(false);
+  const [workspaceLinkMode, setWorkspaceLinkMode] = useState<LinkMode>("symlink");
 
   const [vaultPathDraft, setVaultPathDraft] = useState("");
   const [vaultSaveBusy, setVaultSaveBusy] = useState(false);
@@ -87,6 +110,12 @@ export function App() {
     collapseAll,
   } = useCollapsedGroups();
   const { isFavorite, toggleFavorite } = useFavorites();
+  const {
+    recent: recentProjects,
+    push: pushRecentProject,
+    remove: removeRecentProject,
+    clear: clearRecentProjects,
+  } = useRecentProjects();
   const { preference: themePreference, setPreference: setThemePreference } =
     useTheme();
 
@@ -110,6 +139,34 @@ export function App() {
     setInactiveSkills(inactive);
     return { active, inactive };
   }, []);
+
+  const refreshProjectEnables = useCallback(async (path: string | null) => {
+    if (!path) {
+      setProjectEnables([]);
+      return;
+    }
+    try {
+      const list = await api.listProjectEnables(path);
+      setProjectEnables(list);
+    } catch {
+      setProjectEnables([]);
+    }
+  }, []);
+
+  const commitProjectPath = useCallback(
+    (path: string | null) => {
+      setProjectPath(path);
+      try {
+        if (path) localStorage.setItem(ACTIVE_PROJECT_KEY, path);
+        else localStorage.removeItem(ACTIVE_PROJECT_KEY);
+      } catch {
+        /* ignore */
+      }
+      if (path) pushRecentProject(path);
+      void refreshProjectEnables(path);
+    },
+    [pushRecentProject, refreshProjectEnables],
+  );
 
   /** Auto-save vault path when draft differs from current (blur / browse). */
   const commitVaultPath = useCallback(
@@ -185,19 +242,20 @@ export function App() {
 
   const bootstrap = useCallback(async () => {
     try {
-      await refreshState();
-      const { active, inactive } = await refreshLists();
-      const list = skillsForTab("all", active, inactive);
-      if (list.length && !selectedId) {
-        setSelectedId(list[0].id);
-        await loadDetail(list[0].id);
-      } else if (selectedId) {
-        await loadDetail(selectedId);
-      }
+      const s = await refreshState();
+      if (s?.defaultLinkMode) setWorkspaceLinkMode(s.defaultLinkMode);
+      await refreshLists();
+      await refreshProjectEnables(projectPath);
     } catch (e) {
       showToast(errMsg(e), "error");
     }
-  }, [refreshState, refreshLists, skillsForTab, selectedId, loadDetail, showToast]);
+  }, [
+    refreshState,
+    refreshLists,
+    refreshProjectEnables,
+    projectPath,
+    showToast,
+  ]);
 
   useEffect(() => {
     void bootstrap();
@@ -261,9 +319,89 @@ export function App() {
     }
   };
 
+  const projectSkillIds = useMemo(
+    () => new Set(projectEnables.map((e) => e.skillId)),
+    [projectEnables],
+  );
+
+  const skillsById = useMemo(() => {
+    const m = new Map<string, SkillListItem>();
+    for (const s of activeSkills) m.set(s.id, s);
+    for (const s of inactiveSkills) m.set(s.id, s);
+    return m;
+  }, [activeSkills, inactiveSkills]);
+
+  /** Left-list click: with a project selected, toggle membership; always select row. */
   const selectSkill = async (id: string) => {
     setSelectedId(id);
-    await loadDetail(id);
+    // No project chosen yet — selection only (right pane prompts to pick a project)
+    if (!projectPath) return;
+    if (projectBusy) return;
+
+    const skill =
+      activeSkills.find((s) => s.id === id) ??
+      inactiveSkills.find((s) => s.id === id);
+    if (!skill) return;
+
+    // Disabled skills: select only, no toast (tab already shows they are inactive)
+    if (!skill.active) return;
+
+    const already = projectSkillIds.has(id);
+    setProjectBusy(true);
+    try {
+      if (already) {
+        await api.disableSkill(id, projectPath);
+        showToast(t("toast.removedFromProject", { name: skill.name }));
+      } else {
+        await api.enableSkill(id, projectPath, workspaceLinkMode);
+        showToast(t("toast.addedToProject", { name: skill.name }));
+      }
+      await refreshProjectEnables(projectPath);
+      await refreshState();
+    } catch (e) {
+      const msg = errMsg(e);
+      if (
+        already === false &&
+        (msg.includes("already enabled") || msg.includes("已启用"))
+      ) {
+        await refreshProjectEnables(projectPath);
+        showToast(t("toast.addedToProject", { name: skill.name }));
+      } else {
+        showToast(msg, "error");
+      }
+    } finally {
+      setProjectBusy(false);
+    }
+  };
+
+  const pickProjectFolder = async () => {
+    try {
+      const p = await api.pickFolder(t("enable.pickProject"));
+      if (!p) return;
+      commitProjectPath(p);
+    } catch (e) {
+      showToast(errMsg(e), "error");
+    }
+  };
+
+  const removeSkillFromProject = async (skillId: string) => {
+    if (!projectPath || projectBusy) return;
+    const skill = skillsById.get(skillId);
+    setProjectBusy(true);
+    try {
+      await api.disableSkill(skillId, projectPath);
+      showToast(
+        t("toast.removedFromProject", {
+          name: skill?.name ?? skillId,
+        }),
+      );
+      await refreshProjectEnables(projectPath);
+      await refreshState();
+    } catch (e) {
+      showToast(errMsg(e), "error");
+    } finally {
+      setProjectBusy(false);
+    }
   };
 
   const afterMutation = async (preferId?: string | null) => {
@@ -575,7 +713,7 @@ export function App() {
     }
   };
 
-  const onConfirmEnable = async (projectPath: string, mode: LinkMode) => {
+  const onConfirmEnable = async (targetPath: string, mode: LinkMode) => {
     setEnableBusy(true);
     try {
       if (enableScope === "favorites") {
@@ -589,7 +727,7 @@ export function App() {
         const failures: string[] = [];
         for (const s of list) {
           try {
-            await api.enableSkill(s.id, projectPath, mode);
+            await api.enableSkill(s.id, targetPath, mode);
             ok += 1;
           } catch (e) {
             const msg = errMsg(e);
@@ -622,16 +760,16 @@ export function App() {
           showToast(t("toast.batchFavDone", { parts: parts.join(partSep) }), "ok");
         }
         setEnableOpen(false);
-        if (selectedId) await loadDetail(selectedId);
+        commitProjectPath(targetPath);
         await refreshState();
         return;
       }
 
       if (!detail) return;
-      await api.enableSkill(detail.entry.id, projectPath, mode);
-      showToast(t("toast.enabledTo", { path: projectPath }));
+      await api.enableSkill(detail.entry.id, targetPath, mode);
+      showToast(t("toast.enabledTo", { path: targetPath }));
       setEnableOpen(false);
-      await loadDetail(detail.entry.id);
+      commitProjectPath(targetPath);
       await refreshState();
     } catch (e) {
       showToast(errMsg(e), "error");
@@ -648,30 +786,6 @@ export function App() {
     const all = [...activeSkills, ...inactiveSkills];
     return all.some((s) => String(s.source?.type ?? "").toLowerCase() === "git");
   }, [activeSkills, inactiveSkills]);
-
-  const detailForTab = (() => {
-    if (!detail || !selectedId) return null;
-    if (libraryTab === "disabled") {
-      return !detail.entry.active ? detail : null;
-    }
-    return detail.entry.active ? detail : null;
-  })();
-
-  const emptyCopy =
-    libraryTab === "disabled"
-      ? {
-          title: t("library.emptyDisabledTitle"),
-          hint: t("library.emptyDisabledHint"),
-        }
-      : libraryTab === "favorites"
-        ? {
-            title: t("library.emptyFavoritesTitle"),
-            hint: t("library.emptyFavoritesHint"),
-          }
-        : {
-            title: t("library.emptyAllTitle"),
-            hint: t("library.emptyAllHint"),
-          };
 
   return (
     <div id="app">
@@ -744,18 +858,52 @@ export function App() {
               onChange={(e) => setSearch(e.target.value)}
               aria-label={t("library.searchAria")}
             />
-            {listGroups.length > 0 || hasGitRepos ? (
-              <div className="sidebar-list-toolbar">
-                {listGroups.length > 0 ? (
-                  <button
-                    type="button"
-                    className="btn-ghost-icon"
-                    title={
-                      listGroups.every((g) => isCollapsed(g.key))
-                        ? t("list.expandAll")
-                        : t("list.collapseAll")
+            <div className="sidebar-list-toolbar">
+              <div className="sidebar-list-toolbar-start">
+                <GhostIconButton
+                  label={t("library.create")}
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <CreateIcon />
+                </GhostIconButton>
+                <GhostIconButton
+                  label={t("library.import")}
+                  onClick={() => setImportOpen(true)}
+                >
+                  <ImportIcon />
+                </GhostIconButton>
+              </div>
+              <div className="sidebar-list-toolbar-end">
+                {libraryTab === "favorites" ? (
+                  <GhostIconButton
+                    disabled={favoriteCount === 0}
+                    label={
+                      favoriteCount === 0
+                        ? t("library.enableFavoritesEmptyTitle")
+                        : t("library.enableFavoritesTitle")
                     }
-                    aria-label={
+                    onClick={() => {
+                      if (projectPath) {
+                        // Already have a workspace project — add favorites there
+                        void (async () => {
+                          setEnableScope("favorites");
+                          await onConfirmEnable(
+                            projectPath,
+                            workspaceLinkMode,
+                          );
+                        })();
+                        return;
+                      }
+                      setEnableScope("favorites");
+                      setEnableOpen(true);
+                    }}
+                  >
+                    <AddIcon />
+                  </GhostIconButton>
+                ) : null}
+                {listGroups.length > 0 ? (
+                  <GhostIconButton
+                    label={
                       listGroups.every((g) => isCollapsed(g.key))
                         ? t("list.expandAll")
                         : t("list.collapseAll")
@@ -773,21 +921,15 @@ export function App() {
                     ) : (
                       <CollapseAllIcon />
                     )}
-                  </button>
+                  </GhostIconButton>
                 ) : null}
                 {hasGitRepos ? (
-                  <button
-                    type="button"
-                    className={`btn-ghost-icon${
-                      busyRepoKeys.has("__all__") ? " is-spinning" : ""
-                    }`}
-                    disabled={busyRepoKeys.has("__all__")}
-                    title={
-                      busyRepoKeys.has("__all__")
-                        ? t("repo.checkingAll")
-                        : t("repo.checkAllUpdatesTitle")
+                  <GhostIconButton
+                    className={
+                      busyRepoKeys.has("__all__") ? "is-spinning" : undefined
                     }
-                    aria-label={
+                    disabled={busyRepoKeys.has("__all__")}
+                    label={
                       busyRepoKeys.has("__all__")
                         ? t("repo.checkingAll")
                         : t("repo.checkAllUpdatesTitle")
@@ -795,47 +937,24 @@ export function App() {
                     onClick={() => void onCheckAllRepoUpdates()}
                   >
                     <RefreshIcon />
-                  </button>
+                  </GhostIconButton>
                 ) : null}
               </div>
-            ) : null}
-            {libraryTab === "favorites" ? (
-              <div className="sidebar-batch">
-                <button
-                  type="button"
-                  className="btn primary"
-                  disabled={favoriteCount === 0}
-                  title={
-                    favoriteCount === 0
-                      ? t("library.enableFavoritesEmptyTitle")
-                      : t("library.enableFavoritesTitle", {
-                          count: favoriteCount,
-                        })
-                  }
-                  onClick={() => {
-                    setEnableScope("favorites");
-                    setEnableOpen(true);
-                  }}
-                >
-                  {t("library.enableFavorites")}
-                  {favoriteCount > 0 ? (
-                    <span className="nav-badge">{favoriteCount}</span>
-                  ) : null}
-                </button>
-              </div>
-            ) : null}
+            </div>
             <SkillList
               groups={listGroups}
               selectedId={selectedId}
               tab={libraryTab}
               isCollapsed={isCollapsed}
               isFavorite={isFavorite}
+              projectSkillIds={projectPath ? projectSkillIds : undefined}
               gitUpdates={gitUpdates}
               busyRepoKeys={busyRepoKeys}
               onToggleGroup={toggleGroup}
               onSelect={(id) => void selectSkill(id)}
               onQuickToggleActive={(s) => void onQuickToggleActive(s)}
               onToggleFavorite={onToggleFavorite}
+              onViewSkillContent={setViewSkill}
               onDeleteGroup={(k, l, c) => void onDeleteGroup(k, l, c)}
               onCheckRepoUpdate={(k) => void onCheckRepoUpdate(k)}
               onUpdateRepo={(k) => void onUpdateRepo(k)}
@@ -844,26 +963,9 @@ export function App() {
               }}
             />
             <div className="sidebar-footer">
-              <div className="sidebar-footer-left">
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setCreateOpen(true)}
-                >
-                  {t("library.create")}
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => setImportOpen(true)}
-                >
-                  {t("library.import")}
-                </button>
-              </div>
               <button
                 type="button"
-                className="btn btn-icon"
-                title={t("common.settings")}
+                className="btn-ghost-icon btn-icon-settings"
                 aria-label={t("common.settings")}
                 onClick={() => void goView("settings")}
               >
@@ -880,23 +982,28 @@ export function App() {
               onPointerDown={onPointerDown}
               onDoubleClick={onDoubleClick}
             />
-            <SkillDetailPanel
-              detail={detailForTab}
-              emptyTitle={emptyCopy.title}
-              emptyHint={emptyCopy.hint}
-              onEnable={() => {
-                setEnableScope("single");
-                setEnableOpen(true);
-              }}
-              onDisableProject={(p) => void onDisableProject(p)}
-              onToggleActive={() => void onToggleActiveDetail()}
-              onDelete={() => void onDeleteSkill()}
-              onOpenPath={() => {
-                if (detail)
+            <ProjectWorkspace
+              projectPath={projectPath}
+              recentProjects={recentProjects}
+              enables={projectEnables}
+              skillsById={skillsById}
+              linkMode={workspaceLinkMode}
+              busy={projectBusy || enableBusy}
+              onLinkModeChange={setWorkspaceLinkMode}
+              onPickProject={() => void pickProjectFolder()}
+              onSelectRecent={(p) => commitProjectPath(p)}
+              onRemoveRecent={(p) => removeRecentProject(p)}
+              onClearRecent={() => clearRecentProjects()}
+              onClearProject={() => commitProjectPath(null)}
+              onOpenProject={() => {
+                if (projectPath)
                   void api
-                    .openPath(detail.absolutePath)
+                    .openPath(projectPath)
                     .catch((e) => showToast(errMsg(e), "error"));
               }}
+              onRemoveSkill={(id) => void removeSkillFromProject(id)}
+              onSelectSkill={(id) => setSelectedId(id)}
+              selectedSkillId={selectedId}
             />
           </div>
         </section>
@@ -970,6 +1077,11 @@ export function App() {
         busy={busy && createOpen}
         onClose={() => !busy && setCreateOpen(false)}
         onSubmit={(data) => void onCreate(data)}
+      />
+
+      <SkillBodyModal
+        skill={viewSkill}
+        onClose={() => setViewSkill(null)}
       />
 
       <ImportModal

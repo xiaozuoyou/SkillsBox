@@ -358,6 +358,26 @@ export function SettingsView({
               aria-label={t("settings.updateSection")}
             >
               <div className="settings-update-block">
+                {updateStatus ? (
+                  <div
+                    className={`settings-update-status settings-update-status--${updateStatusKind}`}
+                    role="status"
+                  >
+                    <span
+                      className="settings-update-status-dot"
+                      aria-hidden="true"
+                    />
+                    <div className="settings-update-status-body">
+                      <p className="settings-update-status-msg">{updateStatus}</p>
+                      {pendingUpdate?.body && updateStatusKind === "info" ? (
+                        <p className="settings-update-notes">
+                          {pendingUpdate.body}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="settings-update-head">
                   <div className="settings-update-copy">
                     <div className="settings-row-title">
@@ -414,26 +434,6 @@ export function SettingsView({
                       className="settings-update-progress-bar"
                       style={{ width: `${downloadPct}%` }}
                     />
-                  </div>
-                ) : null}
-
-                {updateStatus ? (
-                  <div
-                    className={`settings-update-status settings-update-status--${updateStatusKind}`}
-                    role="status"
-                  >
-                    <span
-                      className="settings-update-status-dot"
-                      aria-hidden="true"
-                    />
-                    <div className="settings-update-status-body">
-                      <p className="settings-update-status-msg">{updateStatus}</p>
-                      {pendingUpdate?.body && updateStatusKind === "info" ? (
-                        <p className="settings-update-notes">
-                          {pendingUpdate.body}
-                        </p>
-                      ) : null}
-                    </div>
                   </div>
                 ) : null}
               </div>

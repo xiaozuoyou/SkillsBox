@@ -67,7 +67,28 @@ SkillsBox 把职责拆成两层：
 
 ## 快速上手
 
-### 环境
+### 安装（macOS）
+
+1. 从 [Releases](https://github.com/xiaozuoyou/SkillsBox/releases) 下载最新 `.dmg`，打开并将 **SkillsBox** 拖到「应用程序」。
+2. **首次运行前**请先在终端执行下面命令（去掉系统隔离标记）。当前发布包**未做 Apple 开发者签名/公证**，不执行这一步时，双击常会提示「无法打开 / 已损坏」。
+
+若 App 在「应用程序」里：
+
+```bash
+xattr -cr /Applications/SkillsBox.app
+```
+
+若还在下载目录、尚未拖进应用程序（路径按实际修改）：
+
+```bash
+xattr -cr ~/Downloads/SkillsBox.app
+```
+
+3. 再打开 SkillsBox：访达中进入「应用程序」，**双击**运行；若仍被拦截，可 **右键 SkillsBox → 打开**，在提示里确认打开。
+
+> 说明：`xattr -cr` 只清除从网络下载带来的隔离属性（quarantine），不会修改 App 内容。每次从 GitHub **重新下载/覆盖安装**后，若又无法打开，再执行一次即可。
+
+### 环境（从源码开发）
 
 - [Rust](https://www.rust-lang.org/) + [Tauri 2 前置依赖](https://v2.tauri.app/start/prerequisites/)
 - Node 18+、[pnpm](https://pnpm.io/)

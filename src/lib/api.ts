@@ -4,6 +4,7 @@ import type {
   AppState,
   GitRepoRecord,
   GitRepoUpdateStatus,
+  EnableRecord,
   ImportPreview,
   ImportResult,
   LinkMode,
@@ -93,6 +94,9 @@ export const api = {
     invoke<void>("disable_skill", {
       request: { skillId, projectPath },
     }),
+
+  listProjectEnables: (projectPath: string) =>
+    invoke<EnableRecord[]>("list_project_enables", { projectPath }),
 
   /**
    * Native folder picker via plugin-dialog (async).

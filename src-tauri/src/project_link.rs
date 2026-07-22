@@ -210,12 +210,16 @@ pub fn list_enables_for_project(
     project_path: &str,
 ) -> AppResult<Vec<EnableRecord>> {
     let reg = vault::load_registry(vault)?;
-    let project = Path::new(project_path);
+    let project = canonicalize_project(Path::new(project_path)).unwrap_or_else(|_| {
+        PathBuf::from(project_path)
+    });
     Ok(reg
         .enables
         .into_iter()
         .filter(|e| {
-            Path::new(&e.project_path) == project || e.project_path == project_path
+            Path::new(&e.project_path) == project.as_path()
+                || e.project_path == project_path
+                || Path::new(&e.project_path) == Path::new(project_path)
         })
         .collect())
 }

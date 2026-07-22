@@ -22,6 +22,17 @@ export function WindowControls() {
     };
   }, []);
 
+  /* Drive CSS window radius: square when maximized, rounded otherwise */
+  useEffect(() => {
+    document.documentElement.classList.toggle(
+      "is-window-maximized",
+      maximized,
+    );
+    return () => {
+      document.documentElement.classList.remove("is-window-maximized");
+    };
+  }, [maximized]);
+
   const minimize = useCallback(() => {
     void getCurrentWindow().minimize();
   }, []);

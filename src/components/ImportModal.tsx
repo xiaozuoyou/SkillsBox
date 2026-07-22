@@ -245,30 +245,38 @@ export function ImportModal({
                   {t("import.overwriteAll")}
                 </button>
               </div>
-              <ul className="conflict-list">
-                {conflicts.map((c) => {
+              <ul className="conflict-list" role="list">
+                {conflicts.map((c, index) => {
                   const checked = overwrite.has(c.name);
+                  const label = c.name?.trim() || `skill-${index + 1}`;
+                  const desc = c.description?.trim() ?? "";
                   return (
-                    <li key={c.name}>
-                      <label className="conflict-item">
+                    <li key={`${label}-${index}`}>
+                      <label
+                        className={`conflict-item${
+                          checked ? " is-overwrite" : ""
+                        }`}
+                      >
                         <input
                           type="checkbox"
                           checked={checked}
                           disabled={busy}
                           onChange={() => toggleOverwrite(c.name)}
                         />
-                        <span className="conflict-item-body">
-                          <span className="conflict-name">{c.name}</span>
-                          {c.description ? (
-                            <span className="muted small conflict-desc">
-                              {c.description}
+                        <span className="conflict-item-main">
+                          <span className="conflict-name" title={label}>
+                            {label}
+                          </span>
+                          {desc ? (
+                            <span className="conflict-desc" title={desc}>
+                              {desc}
                             </span>
                           ) : null}
-                          <span className="muted small">
-                            {checked
-                              ? t("import.willOverwrite")
-                              : t("import.willSkip")}
-                          </span>
+                        </span>
+                        <span className="conflict-status">
+                          {checked
+                            ? t("import.willOverwrite")
+                            : t("import.willSkip")}
                         </span>
                       </label>
                     </li>

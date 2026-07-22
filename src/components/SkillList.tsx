@@ -8,7 +8,7 @@ import type {
   SkillGroup,
   SkillListItem,
 } from "../lib/types";
-import { ArchiveIcon, StarIcon, UnarchiveIcon } from "./Icons";
+import { StarIcon } from "./Icons";
 
 interface Props {
   groups: SkillGroup[];
@@ -16,6 +16,8 @@ interface Props {
   tab: LibraryTab;
   isCollapsed: (key: string) => boolean;
   isFavorite: (id: string) => boolean;
+  /** Skill ids already linked into the active project workspace */
+  projectSkillIds?: ReadonlySet<string>;
   gitUpdates?: Record<string, GitRepoUpdateStatus>;
   /** Repo keys currently checking/updating (`__all__` = bulk check). */
   busyRepoKeys?: ReadonlySet<string>;
@@ -23,6 +25,7 @@ interface Props {
   onSelect: (id: string) => void;
   onQuickToggleActive: (skill: SkillListItem) => void;
   onToggleFavorite: (skill: SkillListItem) => void;
+  onViewSkillContent: (skill: SkillListItem) => void;
   onDeleteGroup: (repoKey: string, label: string, count: number) => void;
   onCheckRepoUpdate?: (repoKey: string) => void;
   onUpdateRepo?: (repoKey: string) => void;
@@ -36,11 +39,35 @@ function isGitGroup(g: SkillGroup): boolean {
   });
 }
 
-interface CtxMenu {
-  x: number;
-  y: number;
-  group: SkillGroup;
-  browserUrl: string | null;
+type CtxMenu =
+  | {
+      kind: "group";
+      x: number;
+      y: number;
+      group: SkillGroup;
+      browserUrl: string | null;
+    }
+  | {
+      kind: "skill";
+      x: number;
+      y: number;
+      skill: SkillListItem;
+    };
+
+function clampMenuPos(
+  clientX: number,
+  clientY: number,
+  menuW: number,
+  menuH: number,
+) {
+  const pad = 8;
+  let x = clientX;
+  let y = clientY;
+  if (x + menuW > window.innerWidth - pad) x = window.innerWidth - menuW - pad;
+  if (y + menuH > window.innerHeight - pad) y = window.innerHeight - menuH - pad;
+  if (x < pad) x = pad;
+  if (y < pad) y = pad;
+  return { x, y };
 }
 
 export function SkillList({
@@ -49,12 +76,14 @@ export function SkillList({
   tab,
   isCollapsed,
   isFavorite,
+  projectSkillIds,
   gitUpdates = {},
   busyRepoKeys = new Set(),
   onToggleGroup,
   onSelect,
   onQuickToggleActive,
   onToggleFavorite,
+  onViewSkillContent,
   onDeleteGroup,
   onCheckRepoUpdate,
   onUpdateRepo,
@@ -101,20 +130,20 @@ export function SkillList({
 
   const isDisabledTab = tab === "disabled";
 
-  const openContextMenu = (e: React.MouseEvent, g: SkillGroup) => {
+  const openGroupMenu = (e: React.MouseEvent, g: SkillGroup) => {
     e.preventDefault();
     e.stopPropagation();
     const uri = groupGitUri(g.items);
     const browserUrl = uri ? gitUriToBrowserUrl(uri) : null;
-    // Keep menu inside viewport
-    const pad = 8;
-    const menuW = 180;
-    const menuH = 140;
-    let x = e.clientX;
-    let y = e.clientY;
-    if (x + menuW > window.innerWidth - pad) x = window.innerWidth - menuW - pad;
-    if (y + menuH > window.innerHeight - pad) y = window.innerHeight - menuH - pad;
-    setCtx({ x, y, group: g, browserUrl });
+    const { x, y } = clampMenuPos(e.clientX, e.clientY, 180, 160);
+    setCtx({ kind: "group", x, y, group: g, browserUrl });
+  };
+
+  const openSkillMenu = (e: React.MouseEvent, skill: SkillListItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const { x, y } = clampMenuPos(e.clientX, e.clientY, 168, 100);
+    setCtx({ kind: "skill", x, y, skill });
   };
 
   return (
@@ -133,7 +162,7 @@ export function SkillList({
           >
             <div
               className="skill-group-header"
-              onContextMenu={(e) => openContextMenu(e, g)}
+              onContextMenu={(e) => openGroupMenu(e, g)}
             >
               <button
                 type="button"
@@ -174,15 +203,33 @@ export function SkillList({
             <ul className="skill-group-body">
               {g.items.map((s) => {
                 const fav = isFavorite(s.id);
+                const inProject = projectSkillIds?.has(s.id) ?? false;
+                const classes = [
+                  selectedId === s.id ? "active" : "",
+                  inProject ? "in-project" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ");
                 return (
                   <li
                     key={s.id}
-                    className={selectedId === s.id ? "active" : undefined}
+                    className={classes || undefined}
                     onClick={() => onSelect(s.id)}
+                    onContextMenu={(e) => openSkillMenu(e, s)}
+                    title={
+                      inProject
+                        ? t("list.inProjectTitle", { name: s.name })
+                        : s.name
+                    }
                   >
                     <span className="name" title={s.name}>
                       {s.name}
                     </span>
+                    {inProject ? (
+                      <span className="skill-in-project-mark" aria-hidden>
+                        ✓
+                      </span>
+                    ) : null}
                     {!isDisabledTab ? (
                       <button
                         type="button"
@@ -198,26 +245,6 @@ export function SkillList({
                         <StarIcon filled={fav} />
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      className={
-                        isDisabledTab
-                          ? "btn-quick btn-quick-enable"
-                          : "btn-quick btn-quick-disable"
-                      }
-                      title={
-                        isDisabledTab ? t("common.enable") : t("common.disable")
-                      }
-                      aria-label={
-                        isDisabledTab ? t("common.enable") : t("common.disable")
-                      }
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onQuickToggleActive(s);
-                      }}
-                    >
-                      {isDisabledTab ? <UnarchiveIcon /> : <ArchiveIcon />}
-                    </button>
                   </li>
                 );
               })}
@@ -235,69 +262,103 @@ export function SkillList({
               onClick={(e) => e.stopPropagation()}
               onContextMenu={(e) => e.preventDefault()}
             >
-              {isGitGroup(ctx.group) && onCheckRepoUpdate ? (
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="ctx-menu-item"
-                  disabled={
-                    busyRepoKeys.has(ctx.group.key) ||
-                    busyRepoKeys.has("__all__")
-                  }
-                  onClick={() => {
-                    const key = ctx.group.key;
-                    setCtx(null);
-                    onCheckRepoUpdate(key);
-                  }}
-                >
-                  {t("repo.checkUpdate")}
-                </button>
-              ) : null}
-              {isGitGroup(ctx.group) &&
-              gitUpdates[ctx.group.key]?.updateAvailable &&
-              onUpdateRepo ? (
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="ctx-menu-item"
-                  disabled={busyRepoKeys.has(ctx.group.key)}
-                  onClick={() => {
-                    const key = ctx.group.key;
-                    setCtx(null);
-                    onUpdateRepo(key);
-                  }}
-                >
-                  {t("repo.update")}
-                </button>
-              ) : null}
-              {ctx.browserUrl && onOpenRepoInBrowser ? (
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="ctx-menu-item"
-                  onClick={() => {
-                    onOpenRepoInBrowser(ctx.browserUrl!);
-                    setCtx(null);
-                  }}
-                >
-                  {t("repo.viewRepo")}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                role="menuitem"
-                className="ctx-menu-item ctx-menu-item--danger"
-                onClick={() => {
-                  const g = ctx.group;
-                  setCtx(null);
-                  // Defer so the menu unmounts before the confirm dialog opens
-                  window.setTimeout(() => {
-                    onDeleteGroup(g.key, g.label, g.items.length);
-                  }, 0);
-                }}
-              >
-                {t("repo.deleteRepo")}
-              </button>
+              {ctx.kind === "skill" ? (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="ctx-menu-item"
+                    onClick={() => {
+                      const skill = ctx.skill;
+                      setCtx(null);
+                      onViewSkillContent(skill);
+                    }}
+                  >
+                    {t("list.viewContent")}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="ctx-menu-item"
+                    onClick={() => {
+                      const skill = ctx.skill;
+                      setCtx(null);
+                      window.setTimeout(() => {
+                        onQuickToggleActive(skill);
+                      }, 0);
+                    }}
+                  >
+                    {ctx.skill.active
+                      ? t("common.disable")
+                      : t("common.enable")}
+                  </button>
+                </>
+              ) : (
+                <>
+                  {isGitGroup(ctx.group) && onCheckRepoUpdate ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="ctx-menu-item"
+                      disabled={
+                        busyRepoKeys.has(ctx.group.key) ||
+                        busyRepoKeys.has("__all__")
+                      }
+                      onClick={() => {
+                        const key = ctx.group.key;
+                        setCtx(null);
+                        onCheckRepoUpdate(key);
+                      }}
+                    >
+                      {t("repo.checkUpdate")}
+                    </button>
+                  ) : null}
+                  {isGitGroup(ctx.group) &&
+                  gitUpdates[ctx.group.key]?.updateAvailable &&
+                  onUpdateRepo ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="ctx-menu-item"
+                      disabled={busyRepoKeys.has(ctx.group.key)}
+                      onClick={() => {
+                        const key = ctx.group.key;
+                        setCtx(null);
+                        onUpdateRepo(key);
+                      }}
+                    >
+                      {t("repo.update")}
+                    </button>
+                  ) : null}
+                  {ctx.browserUrl && onOpenRepoInBrowser ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="ctx-menu-item"
+                      onClick={() => {
+                        onOpenRepoInBrowser(ctx.browserUrl!);
+                        setCtx(null);
+                      }}
+                    >
+                      {t("repo.viewRepo")}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="ctx-menu-item ctx-menu-item--danger"
+                    onClick={() => {
+                      const g = ctx.group;
+                      setCtx(null);
+                      window.setTimeout(() => {
+                        onDeleteGroup(g.key, g.label, g.items.length);
+                      }, 0);
+                    }}
+                  >
+                    {t("repo.deleteRepo")}
+                  </button>
+                </>
+              )}
             </div>,
             document.body,
           )

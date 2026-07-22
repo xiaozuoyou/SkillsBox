@@ -11,6 +11,7 @@
   },
   "app": {
     "withGlobalTauri": false,
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "SkillsBox",
@@ -19,7 +20,7 @@
         "minWidth": 800,
         "minHeight": 560,
         "decorations": false,
-        "transparent": false,
+        "transparent": true,
         "shadow": true
       }
     ],
