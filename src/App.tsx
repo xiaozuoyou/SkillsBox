@@ -465,48 +465,6 @@ export function App() {
     }
   };
 
-  const onDeleteSkill = async () => {
-    if (!detail) return;
-    if (
-      !window.confirm(
-        t("confirm.deleteSkill", { name: detail.entry.name }),
-      )
-    ) {
-      return;
-    }
-    try {
-      await api.deleteSkill(detail.entry.id, true);
-      showToast(t("toast.deletedNamed", { name: detail.entry.name }));
-      await afterMutation(null);
-    } catch (e) {
-      showToast(errMsg(e), "error");
-    }
-  };
-
-  const onToggleActiveDetail = async () => {
-    if (!detail) return;
-    try {
-      const next = !detail.entry.active;
-      await api.setSkillActive(detail.entry.id, next);
-      showToast(next ? t("toast.enabled") : t("toast.disabled"));
-      await afterMutation(detail.entry.id);
-    } catch (e) {
-      showToast(errMsg(e), "error");
-    }
-  };
-
-  const onDisableProject = async (projectPath: string) => {
-    if (!detail) return;
-    try {
-      await api.disableSkill(detail.entry.id, projectPath);
-      showToast(t("toast.uninstalled"));
-      await loadDetail(detail.entry.id);
-      await refreshState();
-    } catch (e) {
-      showToast(errMsg(e), "error");
-    }
-  };
-
   const onCreate = async (data: {
     name: string;
     description: string;
